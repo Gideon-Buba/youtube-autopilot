@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
+.env
+
+# YouTube OAuth token (contains sensitive credentials)
+.youtube_token.json
+
+# Generated pipeline output (audio, images, videos)
+output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
