@@ -11,7 +11,7 @@ dist/
 .youtube_token.json
 
 # Generated pipeline output (audio, images, videos)
-output/
+assets/
 
 # OS files
 .DS_Store

@@ -1,9 +1,13 @@
 import { google } from "googleapis";
 import fs from "fs";
-import { Script } from "./types";
-import { getAuthenticatedClient } from "./auth";
+import type { Script } from "./types.js";
+import { getAuthenticatedClient } from "./auth.js";
+import "dotenv/config";
 
-export async function uploadToYouTube(videoPath: string, script: Script): Promise<string> {
+export async function uploadToYouTube(
+  videoPath: string,
+  script: Script,
+): Promise<string> {
   const auth = await getAuthenticatedClient();
   const youtube = google.youtube({ version: "v3", auth });
 
@@ -17,11 +21,12 @@ export async function uploadToYouTube(videoPath: string, script: Script): Promis
         title: script.title,
         description: script.description,
         tags: script.tags,
-        categoryId: "27", // Education
+        categoryId: "27",
         defaultLanguage: "en",
       },
       status: {
-        privacyStatus: "private", // Upload as private for manual review before publishing
+        privacyStatus: "public",
+        selfDeclaredMadeForKids: false,
       },
     },
     media: {
@@ -30,9 +35,5 @@ export async function uploadToYouTube(videoPath: string, script: Script): Promis
     },
   });
 
-  const videoId = response.data.id!;
-  console.log(`  Video ID: ${videoId}`);
-  console.log(`  URL: https://www.youtube.com/watch?v=${videoId}`);
-
-  return videoId;
+  return response.data.id!;
 }

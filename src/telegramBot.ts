@@ -1,50 +1,77 @@
 import TelegramBot from "node-telegram-bot-api";
-import { Script, ApprovalDecision } from "./types";
+import type { Script, ApprovalDecision } from "./types.js";
+import "dotenv/config";
 
-const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID!;
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 
-export async function sendForApproval(script: Script): Promise<ApprovalDecision> {
-  const token = process.env.TELEGRAM_BOT_TOKEN!;
-  const chatId = process.env.TELEGRAM_CHAT_ID!;
+export async function requestApproval(
+  script: Script,
+): Promise<ApprovalDecision> {
+  const bot = new TelegramBot(TOKEN, { polling: false });
 
-  // Send-only bot for the initial message
-  const sender = new TelegramBot(token, { polling: false });
+  const preview = script.facts
+    .slice(0, 3)
+    .map((f) => `  ${f.number}. ${f.heading}`)
+    .join("\n");
+  const message = [
+    `🎬 *New Video Ready for Approval*`,
+    `*Title:* ${script.title}`,
+    `*Hook:* ${script.hook}`,
+    `*Facts:*`,
+    preview,
+    `  ... and ${script.facts.length - 3} more`,
+    `Approve?`,
+  ].join("\n");
 
-  const factList = script.facts.map(f => `  ${f.number}. ${f.heading}`).join("\n");
-  const message =
-    `*New Video Script Ready*\n\n` +
-    `*Title:* ${script.title}\n\n` +
-    `*Hook:* ${script.hook}\n\n` +
-    `*Facts (${script.facts.length}):*\n${factList}\n\n` +
-    `*Outro:* ${script.outro}\n\n` +
-    `*Tags:* ${script.tags.slice(0, 6).join(", ")}`;
-
-  await sender.sendMessage(chatId, message, {
+  await bot.sendMessage(CHAT_ID, message, {
     parse_mode: "Markdown",
     reply_markup: {
-      inline_keyboard: [[
-        { text: "✅ Approve", callback_data: "approve" },
-        { text: "❌ Reject", callback_data: "reject" },
-      ]],
+      inline_keyboard: [
+        [
+          { text: "✅ Approve", callback_data: "approve" },
+          { text: "❌ Reject", callback_data: "reject" },
+        ],
+      ],
     },
   });
 
-  return new Promise((resolve) => {
-    const poller = new TelegramBot(token, { polling: true });
+  return new Promise<ApprovalDecision>((resolve, reject) => {
+    const pollerBot = new TelegramBot(TOKEN, { polling: true });
 
-    const timer = setTimeout(() => {
-      poller.stopPolling();
-      console.log("Approval timed out — defaulting to reject");
-      resolve("reject");
-    }, APPROVAL_TIMEOUT_MS);
+    pollerBot.on("polling_error", () => {}); // silence network errors
 
-    poller.on("callback_query", async (query) => {
-      if (query.message?.chat.id.toString() !== chatId) return;
+    const timer = setTimeout(
+      () => {
+        pollerBot.stopPolling();
+        reject(new Error("Approval timed out"));
+      },
+      5 * 60 * 1000,
+    );
+
+    pollerBot.on("callback_query", (query) => {
       clearTimeout(timer);
-      await poller.stopPolling();
-      const decision = query.data as ApprovalDecision;
-      await sender.answerCallbackQuery(query.id, { text: `Script ${decision}d!` });
-      resolve(decision);
+      pollerBot.stopPolling();
+      resolve(query.data as ApprovalDecision);
     });
+  });
+}
+
+export async function sendConfirmation(
+  videoUrl: string,
+  title: string,
+): Promise<void> {
+  const bot = new TelegramBot(TOKEN, { polling: false });
+  await bot.sendMessage(
+    CHAT_ID,
+    `🎉 *Video is Live!*\n*Title:* ${title}\n\n🔗 ${videoUrl}`,
+    { parse_mode: "Markdown" },
+  );
+}
+
+export async function sendError(error: Error): Promise<void> {
+  const bot = new TelegramBot(TOKEN, { polling: false });
+  await bot.sendMessage(CHAT_ID, `❌ *Pipeline Error*\n\`${error.message}\``, {
+    parse_mode: "Markdown",
   });
 }

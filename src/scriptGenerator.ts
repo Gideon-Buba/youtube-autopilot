@@ -1,37 +1,52 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Script } from "./types";
+import Groq from "groq-sdk";
+import type { Script } from "./types.js";
+import "dotenv/config";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-export async function generateScript(topic: string, factCount = 10): Promise<Script> {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-  const prompt = `You are a YouTube scriptwriter. Create a script for a "${factCount} Amazing Facts About ${topic}" video.
-
-Return ONLY valid JSON matching this exact structure:
+export async function generateScript(topic: string): Promise<Script> {
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are a JSON API. You only respond with valid JSON. No markdown, no backticks, no explanation. Only raw JSON.",
+      },
+      {
+        role: "user",
+        content: `Write a YouTube Top 10 script for: "${topic}"
+        
+Return this exact JSON structure with exactly 10 facts:
 {
-  "title": "string (YouTube video title, click-worthy, under 100 chars)",
-  "description": "string (YouTube description, 150-200 words with keywords)",
-  "tags": ["array", "of", "10-15", "relevant", "tags"],
-  "hook": "string (opening 2-3 sentences to immediately hook the viewer)",
+  "title": "video title here",
+  "description": "2-3 sentence description with hashtags",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "hook": "one sentence opening hook",
   "facts": [
     {
       "number": 1,
-      "heading": "string (short punchy fact title, under 10 words)",
-      "narration": "string (2-3 engaging sentences narrating this fact)",
-      "imagePrompt": "string (detailed image generation prompt, photorealistic, cinematic lighting)"
+      "heading": "Short Heading",
+      "narration": "Two sentence narration of the fact.",
+      "imagePrompt": "Cinematic image description for this fact."
     }
   ],
-  "outro": "string (closing 2-3 sentences, ask viewers to like and subscribe)"
-}
+  "outro": "Short call to action."
+}`,
+      },
+    ],
+    temperature: 0.7,
+    max_tokens: 4000,
+    response_format: { type: "json_object" },
+  });
 
-Generate exactly ${factCount} facts. Make narration engaging, conversational, and educational. Image prompts should be vivid and highly descriptive.`;
+  const text = completion.choices[0].message.content!;
+  const script = JSON.parse(text) as Script;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  // Ensure exactly 10 facts
+  if (!script.facts || script.facts.length !== 10) {
+    throw new Error(`Expected 10 facts, got ${script.facts?.length ?? 0}`);
+  }
 
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("Failed to extract JSON from Gemini response");
-
-  return JSON.parse(jsonMatch[0]) as Script;
+  return script;
 }

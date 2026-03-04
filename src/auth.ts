@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 import fs from "fs";
@@ -11,7 +14,7 @@ function createOAuthClient(): OAuth2Client {
   return new google.auth.OAuth2(
     process.env.YOUTUBE_CLIENT_ID,
     process.env.YOUTUBE_CLIENT_SECRET,
-    "urn:ietf:wg:oauth:2.0:oob"
+    "urn:ietf:wg:oauth:2.0:oob",
   );
 }
 
@@ -24,12 +27,18 @@ export async function getAuthenticatedClient(): Promise<OAuth2Client> {
     return client;
   }
 
-  const authUrl = client.generateAuthUrl({ access_type: "offline", scope: SCOPES });
+  const authUrl = client.generateAuthUrl({
+    access_type: "offline",
+    scope: SCOPES,
+  });
   console.log("\nAuthorize this app by visiting:\n");
   console.log(authUrl);
 
   const code = await new Promise<string>((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
     rl.question("\nEnter the authorization code: ", (answer) => {
       rl.close();
       resolve(answer.trim());
@@ -39,7 +48,10 @@ export async function getAuthenticatedClient(): Promise<OAuth2Client> {
   const { tokens } = await client.getToken(code);
   client.setCredentials(tokens);
   fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
-  console.log("Token saved to", TOKEN_PATH);
-
+  console.log("✅ Token saved to", TOKEN_PATH);
   return client;
 }
+
+getAuthenticatedClient()
+  .then(() => process.exit(0))
+  .catch(console.error);

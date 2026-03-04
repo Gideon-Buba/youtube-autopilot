@@ -1,47 +1,69 @@
 import axios from "axios";
 import fs from "fs";
-import path from "path";
-import { AudioSegment, SegmentWithImage } from "./types";
+import { execSync } from "child_process";
+import type { AudioSegment, SegmentWithImage } from "./types.js";
+import "dotenv/config";
 
-const HF_IMG_MODEL = "stabilityai/stable-diffusion-xl-base-1.0";
-const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_IMG_MODEL}`;
-
-async function generateImage(prompt: string, outputPath: string): Promise<void> {
-  const response = await axios.post(
-    HF_API_URL,
-    {
-      inputs: prompt,
-      parameters: {
-        width: 1280,
-        height: 720,
-        num_inference_steps: 30,
-        guidance_scale: 7.5,
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.HF_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      responseType: "arraybuffer",
-      timeout: 120_000,
+const HF_MODEL = "black-forest-labs/FLUX.1-schnell";
+const HF_API_URL = `https://router.huggingface.co/hf-inference/models/${HF_MODEL}`;
+export async function generateImage(
+  prompt: string,
+  outputPath: string,
+  retries = 3,
+): Promise<string> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.post(
+        HF_API_URL,
+        {
+          inputs: `${prompt}, cinematic 16:9, dramatic lighting, ultra detailed, 4k`,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.HF_API_TOKEN}`,
+            "Content-Type": "application/json",
+            Accept: "image/png",
+          },
+          responseType: "arraybuffer",
+          timeout: 90_000,
+        },
+      );
+      fs.writeFileSync(outputPath, Buffer.from(response.data as ArrayBuffer));
+      return outputPath;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      console.warn(`    ⚠️  HF attempt ${attempt} failed, retrying in 10s...`);
+      await new Promise((r) => setTimeout(r, 10_000));
     }
-  );
-  fs.writeFileSync(outputPath, Buffer.from(response.data));
+  }
+  throw new Error("Image generation failed");
 }
 
-export async function generateImages(
+export async function generateAllImages(
   segments: AudioSegment[],
-  outputDir: string
+  imagesDir: string,
 ): Promise<SegmentWithImage[]> {
-  fs.mkdirSync(outputDir, { recursive: true });
+  fs.mkdirSync(imagesDir, { recursive: true });
   const results: SegmentWithImage[] = [];
 
-  for (const segment of segments) {
-    const imagePath = path.join(outputDir, `${segment.label}.png`);
-    console.log(`  Generating image: ${segment.label}`);
-    await generateImage(segment.imagePrompt, imagePath);
-    results.push({ ...segment, imagePath });
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const imagePath = `${imagesDir}/${seg.label}.png`;
+    console.log(`    🖼️  Image ${i + 1}/${segments.length}: ${seg.label}`);
+    try {
+      await generateImage(seg.imagePrompt, imagePath);
+      results.push({ ...seg, imagePath });
+    } catch {
+      console.warn(
+        `    ⚠️  Image gen failed for "${seg.label}", using fallback`,
+      );
+      const fallbackPath = `${imagesDir}/${seg.label}_fallback.png`;
+      execSync(
+        `ffmpeg -f lavfi -i color=c=black:s=1920x1080:d=1 -frames:v 1 "${fallbackPath}" -y`,
+        { stdio: "pipe" },
+      );
+      results.push({ ...seg, imagePath: fallbackPath });
+    }
   }
 
   return results;

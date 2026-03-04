@@ -1,5 +1,3 @@
-// ─── Script Types ────────────────────────────────────────────────────────────
-
 export interface Fact {
   number: number;
   heading: string;
@@ -16,8 +14,6 @@ export interface Script {
   outro: string;
 }
 
-// ─── Pipeline Segment Types ───────────────────────────────────────────────────
-
 export interface AudioSegment {
   label: string;
   audioPath: string;
@@ -27,7 +23,5 @@ export interface AudioSegment {
 export interface SegmentWithImage extends AudioSegment {
   imagePath: string;
 }
-
-// ─── Telegram Approval ───────────────────────────────────────────────────────
 
 export type ApprovalDecision = "approve" | "reject";

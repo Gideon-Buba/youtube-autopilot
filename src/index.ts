@@ -1,67 +1,110 @@
 import "dotenv/config";
-import path from "path";
+import cron from "node-cron";
 import fs from "fs";
-import { generateScript } from "./scriptGenerator";
-import { sendForApproval } from "./telegramBot";
-import { generateAudio } from "./tts";
-import { generateImages } from "./imageGen";
-import { assembleVideo } from "./videoAssembler";
-import { uploadToYouTube } from "./uploader";
+import path from "path";
+import { generateScript } from "./scriptGenerator.js";
+import { requestApproval, sendConfirmation, sendError } from "./telegramBot.js";
+import { generateAllAudio } from "./tts.js";
+import { generateAllImages } from "./imageGen.js";
+import { assembleVideo } from "./videoAssembler.js";
+import { uploadToYouTube } from "./uploader.js";
 
-async function main() {
-  const topic = process.argv[2];
-  if (!topic) {
-    console.error("Usage: ts-node src/index.ts \"<topic>\"");
-    console.error("Example: ts-node src/index.ts \"black holes\"");
-    process.exit(1);
+const TOPICS: string[] = [
+  "Top 10 Strangest Historical Facts Most People Don't Know",
+  "Top 10 Ancient Civilizations That Mysteriously Disappeared",
+  "Top 10 Unbelievable Facts About the Roman Empire",
+  "Top 10 Most Brutal Battles in Ancient History",
+  "Top 10 Lost Treasures That Were Never Found",
+  "Top 10 Historical Figures Who Were Completely Different Than You Think",
+  "Top 10 Inventions That Changed the World Forever",
+  "Top 10 Strangest Laws From Ancient Civilizations",
+  "Top 10 Unsolved Mysteries of the Ancient World",
+  "Top 10 Greatest Empires in Human History",
+];
+
+let topicIndex = 0;
+
+async function runPipeline(): Promise<void> {
+  const topic = TOPICS[topicIndex % TOPICS.length];
+  topicIndex++;
+
+  const jobId = Date.now();
+  const workDir = path.resolve(`./assets/jobs/${jobId}`);
+  fs.mkdirSync(workDir, { recursive: true });
+
+  console.log(`\n${"━".repeat(60)}`);
+  console.log(`🚀 Pipeline started: "${topic}"`);
+  console.log(`${"━".repeat(60)}\n`);
+
+  try {
+    console.log("📝 [1/6] Generating script...");
+    const script = await generateScript(topic);
+    fs.writeFileSync(
+      path.join(workDir, "script.json"),
+      JSON.stringify(script, null, 2),
+    );
+    console.log(`   ✅ "${script.title}"\n`);
+
+    console.log("📲 [2/6] Waiting for Telegram approval...");
+    const decision = await requestApproval(script);
+    if (decision !== "approve") {
+      console.log("   ❌ Rejected. Pipeline stopped.\n");
+      return;
+    }
+    console.log("   ✅ Approved!\n");
+
+    console.log("🎙️  [3/6] Generating narration...");
+    const audioSegments = await generateAllAudio(
+      script,
+      path.join(workDir, "audio"),
+    );
+    console.log(`   ✅ ${audioSegments.length} segments\n`);
+
+    console.log("🖼️  [4/6] Generating AI images...");
+    const segmentsWithImages = await generateAllImages(
+      audioSegments,
+      path.join(workDir, "images"),
+    );
+    console.log(`   ✅ ${segmentsWithImages.length} images\n`);
+
+    console.log("🔧 [5/6] Assembling video...");
+    const finalVideoPath = path.join(workDir, "final.mp4");
+    await assembleVideo(segmentsWithImages, workDir, finalVideoPath);
+    console.log("   ✅ Video assembled\n");
+
+    console.log("⬆️  [6/6] Uploading to YouTube...");
+    const videoId = await uploadToYouTube(finalVideoPath, script);
+    const videoUrl = `https://youtube.com/watch?v=${videoId}`;
+    console.log(`   ✅ ${videoUrl}\n`);
+
+    await sendConfirmation(videoUrl, script.title);
+
+    console.log(`${"━".repeat(60)}`);
+    console.log(`🎉 Done! ${videoUrl}`);
+    console.log(`${"━".repeat(60)}\n`);
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error("\n❌ Pipeline error:", error.message);
+    await sendError(error);
   }
-
-  const outputDir = path.join(process.cwd(), "output", Date.now().toString());
-  fs.mkdirSync(outputDir, { recursive: true });
-
-  console.log("\n=== YouTube Autopilot ===");
-  console.log(`Topic:  ${topic}`);
-  console.log(`Output: ${outputDir}\n`);
-
-  // Step 1: Generate script
-  console.log("[1/6] Generating script with Gemini...");
-  const script = await generateScript(topic);
-  fs.writeFileSync(path.join(outputDir, "script.json"), JSON.stringify(script, null, 2));
-  console.log(`Done: "${script.title}"\n`);
-
-  // Step 2: Telegram approval
-  console.log("[2/6] Awaiting Telegram approval (5 min timeout)...");
-  const decision = await sendForApproval(script);
-  if (decision === "reject") {
-    console.log("Script rejected. Pipeline stopped.");
-    process.exit(0);
-  }
-  console.log("Approved!\n");
-
-  // Step 3: Generate TTS audio
-  console.log("[3/6] Generating TTS audio...");
-  const audioSegments = await generateAudio(script, path.join(outputDir, "audio"));
-  console.log(`Done: ${audioSegments.length} segments\n`);
-
-  // Step 4: Generate images
-  console.log("[4/6] Generating images...");
-  const segmentsWithImages = await generateImages(audioSegments, path.join(outputDir, "images"));
-  console.log(`Done: ${segmentsWithImages.length} images\n`);
-
-  // Step 5: Assemble video
-  console.log("[5/6] Assembling video with ffmpeg...");
-  const videoPath = await assembleVideo(segmentsWithImages, outputDir, script.title);
-  console.log(`Done: ${videoPath}\n`);
-
-  // Step 6: Upload to YouTube
-  console.log("[6/6] Uploading to YouTube...");
-  const videoId = await uploadToYouTube(videoPath, script);
-  console.log(`\n=== Pipeline complete! ===`);
-  console.log(`Video ID: ${videoId}`);
-  console.log(`URL: https://www.youtube.com/watch?v=${videoId}\n`);
 }
 
-main().catch((err) => {
-  console.error("\nPipeline failed:", err.message ?? err);
-  process.exit(1);
-});
+// Scheduled for 6pm WAT daily
+cron.schedule(
+  "0 17 * * *",
+  () => {
+    console.log("⏰ 6pm WAT — starting pipeline");
+    runPipeline();
+  },
+  { timezone: "Africa/Lagos" },
+);
+
+console.log("🤖 YouTube Autopilot running");
+console.log("   Scheduled: 6:00 PM WAT daily");
+console.log(`   Topics loaded: ${TOPICS.length}`);
+console.log(
+  "\n💡 To test now, uncomment runPipeline() at the bottom of index.ts\n",
+);
+
+// Uncomment to test immediately:
+runPipeline();

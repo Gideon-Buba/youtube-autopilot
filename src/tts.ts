@@ -1,59 +1,58 @@
-import axios from "axios";
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import { Script, AudioSegment } from "./types";
+import type { Script, AudioSegment } from "./types.js";
 
-const HF_TTS_MODEL = "facebook/mms-tts-eng";
-const HF_API_URL = `https://api-inference.huggingface.co/models/${HF_TTS_MODEL}`;
+const VOICE = "en-US-GuyNeural";
 
-async function textToSpeech(text: string, outputPath: string): Promise<void> {
-  const response = await axios.post(
-    HF_API_URL,
-    { inputs: text },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.HF_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      responseType: "arraybuffer",
-      timeout: 60_000,
-    }
+export async function synthesize(
+  text: string,
+  outputPath: string,
+): Promise<string> {
+  const sanitized = text.replace(/"/g, "'").replace(/\n/g, " ").trim();
+  execSync(
+    `edge-tts --voice "${VOICE}" --text "${sanitized}" --write-media "${outputPath}"`,
+    { stdio: "pipe" },
   );
-  fs.writeFileSync(outputPath, Buffer.from(response.data));
+  return outputPath;
 }
 
-export async function generateAudio(script: Script, outputDir: string): Promise<AudioSegment[]> {
-  fs.mkdirSync(outputDir, { recursive: true });
+export async function generateAllAudio(
+  script: Script,
+  audioDir: string,
+): Promise<AudioSegment[]> {
+  fs.mkdirSync(audioDir, { recursive: true });
   const segments: AudioSegment[] = [];
 
-  // Hook
-  const hookPath = path.join(outputDir, "hook.wav");
-  await textToSpeech(script.hook, hookPath);
+  const hookPath = path.join(audioDir, "hook.mp3");
+  console.log("    🎙️  Hook...");
+  await synthesize(script.hook, hookPath);
   segments.push({
     label: "hook",
     audioPath: hookPath,
-    imagePrompt: script.facts[0]?.imagePrompt ?? "cinematic intro scene with dramatic lighting",
+    imagePrompt: "cinematic documentary history epic wide shot",
   });
-  console.log("  Generated: hook");
 
-  // Facts
   for (const fact of script.facts) {
-    const narration = `${fact.heading}. ${fact.narration}`;
-    const audioPath = path.join(outputDir, `fact_${fact.number}.wav`);
-    await textToSpeech(narration, audioPath);
-    segments.push({ label: `fact_${fact.number}`, audioPath, imagePrompt: fact.imagePrompt });
-    console.log(`  Generated: fact ${fact.number}/${script.facts.length}`);
+    const audioPath = path.join(audioDir, `fact_${fact.number}.mp3`);
+    const narration = `Number ${fact.number}. ${fact.heading}. ${fact.narration}`;
+    console.log(`    🎙️  Fact ${fact.number}: ${fact.heading}`);
+    await synthesize(narration, audioPath);
+    segments.push({
+      label: `fact_${fact.number}`,
+      audioPath,
+      imagePrompt: fact.imagePrompt,
+    });
   }
 
-  // Outro
-  const outroPath = path.join(outputDir, "outro.wav");
-  await textToSpeech(script.outro, outroPath);
+  const outroPath = path.join(audioDir, "outro.mp3");
+  console.log("    🎙️  Outro...");
+  await synthesize(script.outro, outroPath);
   segments.push({
     label: "outro",
     audioPath: outroPath,
-    imagePrompt: "like and subscribe animation, YouTube logo, red button, cinematic outro",
+    imagePrompt: "YouTube subscribe button glowing dark background cinematic",
   });
-  console.log("  Generated: outro");
 
   return segments;
 }
