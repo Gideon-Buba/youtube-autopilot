@@ -20,8 +20,8 @@ export interface AudioSegment {
   imagePrompt: string;
 }
 
-export interface SegmentWithImage extends AudioSegment {
-  imagePath: string;
+export interface SegmentWithVideo extends AudioSegment {
+  videoPath: string;
 }
 
 export type ApprovalDecision = "approve" | "reject";

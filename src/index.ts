@@ -5,7 +5,6 @@ import path from "path";
 import { generateScript } from "./scriptGenerator.js";
 import { requestApproval, sendConfirmation, sendError } from "./telegramBot.js";
 import { generateAllAudio } from "./tts.js";
-import { generateAllImages } from "./imageGen.js";
 import { assembleVideo } from "./videoAssembler.js";
 import { uploadToYouTube } from "./uploader.js";
 

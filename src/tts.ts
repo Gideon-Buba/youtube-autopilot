@@ -1,19 +1,36 @@
-import { execSync } from "child_process";
+import axios from "axios";
 import fs from "fs";
 import path from "path";
 import type { Script, AudioSegment } from "./types.js";
+import "dotenv/config";
 
-const VOICE = "en-US-GuyNeural";
+async function synthesize(text: string, outputPath: string): Promise<string> {
+  const voiceId = process.env.ELEVENLABS_VOICE_ID;
+  const apiKey = process.env.ELEVENLABS_API_KEY;
 
-export async function synthesize(
-  text: string,
-  outputPath: string,
-): Promise<string> {
-  const sanitized = text.replace(/"/g, "'").replace(/\n/g, " ").trim();
-  execSync(
-    `edge-tts --voice "${VOICE}" --text "${sanitized}" --write-media "${outputPath}"`,
-    { stdio: "pipe" },
+  if (!voiceId || !apiKey) {
+    throw new Error("ELEVENLABS_VOICE_ID and ELEVENLABS_API_KEY must be set");
+  }
+
+  const response = await axios.post(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+    {
+      text,
+      model_id: "eleven_monolingual_v1",
+      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+    },
+    {
+      headers: {
+        "xi-api-key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      responseType: "arraybuffer",
+      timeout: 60_000,
+    },
   );
+
+  fs.writeFileSync(outputPath, Buffer.from(response.data as ArrayBuffer));
   return outputPath;
 }
 
@@ -51,7 +68,7 @@ export async function generateAllAudio(
   segments.push({
     label: "outro",
     audioPath: outroPath,
-    imagePrompt: "YouTube subscribe button glowing dark background cinematic",
+    imagePrompt: "YouTube subscribe history channel",
   });
 
   return segments;
