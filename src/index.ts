@@ -5,6 +5,7 @@ import path from "path";
 import { generateScript } from "./scriptGenerator.js";
 import { requestApproval, sendConfirmation, sendError } from "./telegramBot.js";
 import { generateAllAudio } from "./tts.js";
+import { fetchAllVideos } from "./videoFetcher.js";
 import { assembleVideo } from "./videoAssembler.js";
 import { uploadToYouTube } from "./uploader.js";
 
@@ -59,16 +60,16 @@ async function runPipeline(): Promise<void> {
     );
     console.log(`   ✅ ${audioSegments.length} segments\n`);
 
-    console.log("🖼️  [4/6] Generating AI images...");
-    const segmentsWithImages = await generateAllImages(
+    console.log("🎬  [4/6] Fetching Pexels video clips...");
+    const segmentsWithVideos = await fetchAllVideos(
       audioSegments,
-      path.join(workDir, "images"),
+      path.join(workDir, "videos"),
     );
-    console.log(`   ✅ ${segmentsWithImages.length} images\n`);
+    console.log(`   ✅ ${segmentsWithVideos.length} clips\n`);
 
     console.log("🔧 [5/6] Assembling video...");
     const finalVideoPath = path.join(workDir, "final.mp4");
-    await assembleVideo(segmentsWithImages, workDir, finalVideoPath);
+    await assembleVideo(segmentsWithVideos, workDir, finalVideoPath);
     console.log("   ✅ Video assembled\n");
 
     console.log("⬆️  [6/6] Uploading to YouTube...");
@@ -106,4 +107,7 @@ console.log(
 );
 
 // Uncomment to test immediately:
-runPipeline();
+runPipeline().catch((err) => {
+  console.error("Fatal:", err);
+  process.exit(1);
+});

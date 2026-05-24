@@ -4,6 +4,7 @@ import fs from "fs";
 import { generateScript } from "./scriptGenerator.js";
 import { requestApproval } from "./telegramBot.js";
 import { generateAllAudio } from "./tts.js";
+import { fetchAllVideos } from "./videoFetcher.js";
 import { assembleVideo } from "./videoAssembler.js";
 
 async function test() {
@@ -29,12 +30,12 @@ async function test() {
   );
   console.log("✅ Audio:", audioSegments.length, "segments");
 
-  console.log("Step 4: Generating images...");
-  const segments = await generateAllImages(
+  console.log("Step 4: Fetching Pexels video clips...");
+  const segments = await fetchAllVideos(
     audioSegments,
-    path.join(workDir, "images"),
+    path.join(workDir, "videos"),
   );
-  console.log("✅ Images:", segments.length);
+  console.log("✅ Clips:", segments.length);
 
   console.log("Step 5: Assembling video...");
   const videoPath = path.join(workDir, "final.mp4");
