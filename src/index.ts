@@ -10,16 +10,16 @@ import { assembleVideo } from "./videoAssembler.js";
 import { uploadToYouTube } from "./uploader.js";
 
 const TOPICS: string[] = [
-  "Top 10 Strangest Historical Facts Most People Don't Know",
-  "Top 10 Ancient Civilizations That Mysteriously Disappeared",
-  "Top 10 Unbelievable Facts About the Roman Empire",
-  "Top 10 Most Brutal Battles in Ancient History",
-  "Top 10 Lost Treasures That Were Never Found",
-  "Top 10 Historical Figures Who Were Completely Different Than You Think",
-  "Top 10 Inventions That Changed the World Forever",
-  "Top 10 Strangest Laws From Ancient Civilizations",
-  "Top 10 Unsolved Mysteries of the Ancient World",
-  "Top 10 Greatest Empires in Human History",
+  "Top 10 Darkest Secrets of the Nigerian Civil War",
+  "Top 10 Most Powerful Ancient Kingdoms in Nigerian History",
+  "Top 10 Political Assassinations That Shaped Nigeria",
+  "Top 10 Brutal Facts About the Benin Kingdom Empire",
+  "Top 10 Forgotten Heroes of Nigerian Independence",
+  "Top 10 Most Controversial Nigerian Military Coups",
+  "Top 10 Ancient Trade Empires of Northern Nigeria",
+  "Top 10 Shocking Facts About Colonial Nigeria Under Britain",
+  "Top 10 Most Influential Igbo, Yoruba and Hausa Rulers in History",
+  "Top 10 Unsolved Mysteries and Conspiracies in Nigerian History",
 ];
 
 let topicIndex = 0;

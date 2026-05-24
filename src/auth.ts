@@ -6,6 +6,7 @@ import { OAuth2Client } from "google-auth-library";
 import fs from "fs";
 import path from "path";
 import readline from "readline";
+import { fileURLToPath } from "url";
 
 const TOKEN_PATH = path.join(process.cwd(), ".youtube_token.json");
 const SCOPES = ["https://www.googleapis.com/auth/youtube.upload"];
@@ -52,6 +53,8 @@ export async function getAuthenticatedClient(): Promise<OAuth2Client> {
   return client;
 }
 
-getAuthenticatedClient()
-  .then(() => process.exit(0))
-  .catch(console.error);
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  getAuthenticatedClient()
+    .then(() => process.exit(0))
+    .catch(console.error);
+}

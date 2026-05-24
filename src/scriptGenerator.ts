@@ -28,7 +28,8 @@ Return this exact JSON structure with exactly 10 facts:
       "number": 1,
       "heading": "Short Heading",
       "narration": "Two sentence narration of the fact.",
-      "imagePrompt": "Cinematic image description for this fact."
+      "imagePrompt": Short 3-5 word Pexels video search term relevant to this fact and Nigerian/African history. Example: 'Lagos Nigeria market crowd'
+   or 'African warriors battle'
     }
   ],
   "outro": "Short call to action."
